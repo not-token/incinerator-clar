@@ -5,28 +5,34 @@
 (define-constant CONTRACT_OWNER tx-sender)
 
 ;; Public variables ;;
-(define-data-var nothing-burner-amount uint u0)
+(define-data-var tot-burned-amount uint u0)
+(define-data-var tot-burns uint u0)
+(define-map burns-list uint {maker: principal, amount: uint})
+
 
 ;; Functions ;;
-(define-read-only (get-nothing-burner-amount) 
-    ;; variables need to be read to be read 
-    (ok (var-get nothing-burner-amount)))
+(define-read-only (get-burned-amount) 
+    (ok (var-get tot-burned-amount)))
 
-(define-private (increase-nothing-burner-amount (amount uint))
-    (var-set nothing-burner-amount (+ (var-get nothing-burner-amount) amount)))
-;;   no need for ok true since this function is private
-;; resopnse types like ok and err should only be preserved for 
-;; public and readonly functions basically the interface of the contract
-;;   (ok true))
+(define-read-only (get-tot-burns) 
+    (ok (var-get tot-burns)))
+
+(define-read-only (get-burns-list (index uint))
+    (ok (map-get? burns-list index)))   
+
+(define-private (increase-burned-amount (amount uint))
+    (var-set tot-burned-amount (+ (var-get tot-burned-amount) amount)))
+
+(define-private (increase-tot-burns)
+    (var-set tot-burns (+ (var-get tot-burns) u1)))
 
 
 (define-public (burn-nothing (amount uint))
     (begin 
-        ;; unwrap should do the trick for response types unwrap can reformat the error
-        ;; if work with boolean types
-        ;; for the analyzer to know that the unwrap and burn amount operations do the checking for us
-        ;; #[filter(amount)]
+        (asserts! (> amount u0) (err ERR-YOU-POOR))
         (unwrap! (contract-call? 'SP32AEEF6WW5Y0NMJ1S8SBSZDAY8R5J32NBZFPKKZ.nope unwrap amount) (err ERR-ERROR-UNWRAP))
         (unwrap! (contract-call? 'SP32AEEF6WW5Y0NMJ1S8SBSZDAY8R5J32NBZFPKKZ.micro-nthng transfer (as-contract tx-sender) amount) (err ERR-ERROR-TRANSFER))
-        (increase-nothing-burner-amount amount)
+        (map-insert burns-list (var-get tot-burns) {maker: tx-sender, amount: amount})
+        (increase-burned-amount amount)
+        (increase-tot-burns)
         (ok true)))
